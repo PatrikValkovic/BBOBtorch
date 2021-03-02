@@ -6,3 +6,5 @@
 ###############################
 
 from .functions import *
+from .Problem import Problem
+from . import utils

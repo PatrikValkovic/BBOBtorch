@@ -5,6 +5,7 @@
 #
 ###############################
 
+import math
 import torch as t
 from .Problem import Problem
 from . import utils
@@ -99,6 +100,101 @@ def create_f05(dim, dev=None) -> Problem:
         return f + f_opt
     return Problem(
         _f, [x_opt, f_opt, s], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+@utils.seedable
+def create_f06(dim, dev=None) -> Problem:
+    x_opt = utils.rand_xopt(dim, dev)
+    f_opt = utils.rand_fopt(dev)
+    R = utils.rotation_matrix(dim, t.float32, dev)
+    Q = utils.rotation_matrix(dim, t.float32, dev)
+    lamb = utils.Lambda(10, dim, t.float32, dev)
+    def _f(x, x_opt, f_opt, R, Q, lamb):
+        z = (Q @ lamb @ R @ (x - x_opt).T).T
+        s = t.ones_like(x, dtype=x.dtype, device=x.device)
+        s[z * x_opt[None,:] > 0] = 100
+        f = t.pow(utils.T_osz(t.sum(t.pow(s * z, 2), dim=-1)), 0.9)
+        return f + f_opt
+    return Problem(
+        _f, [x_opt, f_opt, R, Q, lamb], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f07(dim, dev=None) -> Problem:
+    x_opt = utils.rand_xopt(dim, dev)
+    f_opt = utils.rand_fopt(dev)
+    R = utils.rotation_matrix(dim, t.float32, dev)
+    Q = utils.rotation_matrix(dim, t.float32, dev)
+    lamb = utils.Lambda(10, dim, t.float32, dev)
+    mult = t.pow(10, 2 * t.arange(0, dim, dtype=t.float32, device=dev) / (dim - 1))
+    def _f(x, x_opt, f_opt, R, Q, lamb, mult):
+        z_hat = (lamb @ R @ (x - x_opt).T).T
+        z_dash = t.full_like(x, 0.5)
+        greater = t.abs(z_hat) > 0.5
+        z_dash[greater] += z_hat[greater]
+        lower = t.logical_not(greater, out=greater)
+        z_dash[lower] += 10 * z_hat[lower]
+        z_dash = t.floor_(z_dash)
+        z_dash[lower] /= 10
+        z = (Q @ z_dash.T).T
+        f = 0.1 * t.maximum(
+            t.abs(z_hat[:,0]) / 10**4,
+            t.sum(mult[None, :] * z * z, dim=-1)
+        )
+        return f + utils.f_pen(x) + f_opt
+    return Problem(
+        _f, [x_opt, f_opt, R, Q, lamb, mult], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f08(dim, dev=None) -> Problem:
+    x_opt = utils.rand_xopt(dim, dev) / 5.0 * 3.0
+    f_opt = utils.rand_fopt(dev)
+    zmax = max(1.0, math.sqrt(dim) / 8.0)
+    def _f(x, x_opt, f_opt, zmax):
+        z = zmax * (x - x_opt[None,:]) + 1
+        unshift = t.index_select(z, dim=-1, index=t.arange(0, dim-1, device=x.device, dtype=t.long))
+        shifted = t.index_select(z, dim=-1, index=t.arange(1, dim, device=x.device, dtype=t.long))
+        s = t.sum(
+            100 * t.pow(t.pow(unshift, 2) - shifted,2) + t.pow(unshift - 1, 2),
+            dim=-1
+        )
+        return s + f_opt
+    return Problem(
+        _f, [x_opt, f_opt, zmax], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f09(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    R = utils.rotation_matrix(dim, dtype=t.float32, dev=dev)
+    zmax = max(1.0, math.sqrt(dim) / 8.0)
+    x_opt = t.ones(size=(dim,), dtype=t.float32, device=dev)
+    x_opt = (x_opt - 0.5) / zmax
+    Rinv = t.inverse(R)
+    x_opt = Rinv @ x_opt
+    def _f(x, f_opt, R, zmax):
+        z = zmax * (R @ x.T).T + 0.5
+        unshift = t.index_select(z, dim=-1, index=t.arange(0, dim-1, device=x.device, dtype=t.long))
+        shifted = t.index_select(z, dim=-1, index=t.arange(1, dim, device=x.device, dtype=t.long))
+        s = t.sum(
+            100 * t.pow(t.pow(unshift, 2) - shifted,2) + t.pow(unshift - 1, 2),
+            dim=-1
+        )
+        return s + f_opt
+    return Problem(
+        _f, [f_opt, R, zmax], x_opt, f_opt,
         t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
         t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
     )

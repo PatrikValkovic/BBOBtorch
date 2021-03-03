@@ -39,7 +39,13 @@ def f_pen(x) -> t.Tensor:
         dim=-1
     )
 
+def rotation_matrix(dim, dtype, dev) -> t.Tensor:
+    R = t.randn(size=(dim,dim), dtype=dtype, device=dev)
+    R, _ = t.qr(R)
+    return R
+
 def rand_xopt(dim, dev = None):
+    #return t.zeros(size=(dim,), dtype=t.float32, device=dev)
     return t.rand(size=(dim,), dtype=t.float32, device=dev) * 10 - 5
 
 def rand_fopt(dev = None):

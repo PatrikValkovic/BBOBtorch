@@ -258,7 +258,7 @@ def create_f13(dim, dev=None) -> Problem:
     x_opt = utils.rand_xopt(dim, dev)
     R = utils.rotation_matrix(dim, t.float32, dev).T
     Q = utils.rotation_matrix(dim, t.float32, dev).T
-    lamb = utils.Lambda(10, dim, t.float32, dev)
+    lamb = utils.Lambda(10, dim, t.float32, dev).T
     def _f(x, f_opt, x_opt, R, Q, lamb):
         z = (x - x_opt[None, :]) @ R @ lamb @ Q
         first = t.pow(z[:,0], 2)
@@ -289,3 +289,125 @@ def create_f14(dim, dev=None) -> Problem:
     )
 
 
+@utils.seedable
+def create_f15(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    x_opt = utils.rand_xopt(dim, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    Q = utils.rotation_matrix(dim, t.float32, dev).T
+    lamb = utils.Lambda(10, dim, t.float32, dev).T
+    def _f(x, f_opt, x_opt, R, Q, lamb):
+        z = utils.T_asy(
+            utils.T_osz((x - x_opt[None, :]) @ R),
+            0.2, dim
+        ) @ Q @ lamb @ R
+        f = 10 * (dim - t.sum(t.cos(2 * utils.PI * z), dim=-1))
+        s = t.sum(t.pow(z, 2), dim=-1)
+        return f + s + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, R, Q, lamb], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f16(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    x_opt = utils.rand_xopt(dim, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    Q = utils.rotation_matrix(dim, t.float32, dev).T
+    lamb = utils.Lambda(1.0/100.0, dim, t.float32, dev).T
+    r11 = t.arange(0, 12)
+    f_0 = t.sum(1 / t.pow(2, r11) * t.cos(2*utils.PI*t.pow(3, r11)*0.5))
+    def _f(x, f_opt, x_opt, R, Q, lamb, f_0, r11):
+        z = utils.T_osz(
+            (x - x_opt[None, :]) @ R
+        ) @ Q @ lamb @ R
+        after_sums = t.pow(0.5, r11[:,None,None]) * t.cos(2*utils.PI*t.pow(3, r11[:,None,None])*(z[None,:,:] + 0.5))
+        summed = 10 * t.pow(1/dim * t.sum(t.sum(after_sums, dim=0), dim=-1) - f_0,3)
+        penalization = 10.0 / dim * utils.f_pen(x)
+        return summed + penalization + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, R, Q, lamb, f_0, r11], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f17(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    x_opt = utils.rand_xopt(dim, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    Q = utils.rotation_matrix(dim, t.float32, dev).T
+    lamb = utils.Lambda(1.0/100.0, dim, t.float32, dev).T
+    def _f(x, f_opt, x_opt, R, Q, lamb):
+        z = utils.T_asy(
+            (x - x_opt[None,:]) @ R,
+            0.5, dim
+        ) @ Q @ lamb
+        s = t.pow(z, 2, out=z)
+        s = t.sqrt(s[:, :-1] + s[:, 1:])
+        bracket = 1.0 / (dim - 1.0) * t.sum(
+            t.sqrt(s) + t.sqrt(s) * t.pow(t.sin(50 * t.pow(s, 1.0 / 5.0)), 2),
+            dim=-1
+        )
+        f = t.pow(bracket, 2, out=bracket)
+        penalization = 10 * utils.f_pen(x)
+        return f + penalization + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, R, Q, lamb], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+
+@utils.seedable
+def create_f18(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    x_opt = utils.rand_xopt(dim, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    Q = utils.rotation_matrix(dim, t.float32, dev).T
+    lamb = utils.Lambda(1000, dim, t.float32, dev).T
+    def _f(x, f_opt, x_opt, R, Q, lamb):
+        z = utils.T_asy(
+            (x - x_opt[None,:]) @ R,
+            0.5, dim
+        ) @ Q @ lamb
+        s = t.pow(z, 2, out=z)
+        s = t.sqrt(s[:, :-1] + s[:, 1:])
+        bracket = 1.0 / (dim - 1.0) * t.sum(
+            t.sqrt(s) + t.sqrt(s) * t.pow(t.sin(50 * t.pow(s, 1.0 / 5.0)), 2),
+            dim=-1
+        )
+        f = t.pow(bracket, 2, out=bracket)
+        penalization = 10 * utils.f_pen(x)
+        return f + penalization + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, R, Q, lamb], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f19(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    zmax = max(1.0, math.sqrt(dim) / 8.0)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    x_opt = t.ones(size=(dim,), dtype=t.float32, device=dev)
+    x_opt = (x_opt - 0.5) / zmax
+    Rinv = t.inverse(R.T)
+    x_opt = Rinv @ x_opt
+    def _f(x, f_opt, R, zmax):
+        z = zmax * x @ R + 0.5
+        s = 100 * t.pow(t.pow(z[:,:-1], 2) - z[:,1:], 2) + t.pow(z[:,:-1] - 1, 2)
+        f = 10.0 / (dim - 1) * t.sum(s / 4000 - t.cos(s), dim=-1)
+        return f + 10 + f_opt
+    return Problem(
+        _f, [f_opt, R, zmax], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )

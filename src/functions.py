@@ -64,6 +64,7 @@ def create_f03(dim, dev=None) -> Problem:
     )
 
 
+# TODO is correct?
 @utils.seedable
 def create_f04(dim, dev=None) -> Problem:
     x_opt = utils.rand_xopt(dim, dev)
@@ -198,3 +199,93 @@ def create_f09(dim, dev=None) -> Problem:
         t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
         t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
     )
+
+
+@utils.seedable
+def create_f10(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    x_opt = utils.rand_xopt(dim, dev)
+    mult = t.pow(10, 6 * t.arange(0, dim, dtype=t.float32, device=dev) / (dim - 1))
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    def _f(x, f_opt, x_opt, mult, R):
+        z = utils.T_osz((x - x_opt[None,:]) @ R)
+        f = t.sum(mult[None,:] * t.pow(z, 2), dim=-1)
+        return f + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, mult, R], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f11(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    x_opt = utils.rand_xopt(dim, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    def _f(x, f_opt, x_opt, R):
+        z = utils.T_osz((x - x_opt[None,:]) @ R)
+        first = 10**6 * t.pow(z[:,0], 2)
+        second = t.sum(t.pow(z[:,1:], 2), dim=-1)
+        return first + second + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, R], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+# TODO is correct?
+@utils.seedable
+def create_f12(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    x_opt = utils.rand_xopt(dim, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    def _f(x, f_opt, x_opt, R):
+        z = utils.T_asy((x - x_opt[None, :]) @ R, 0.5, dim) @ R
+        first = t.pow(z[:,0], 2)
+        second = 10 ** 6 * t.sum(t.pow(z[:,1:], 2), dim=-1)
+        return first + second + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, R], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f13(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    x_opt = utils.rand_xopt(dim, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    Q = utils.rotation_matrix(dim, t.float32, dev).T
+    lamb = utils.Lambda(10, dim, t.float32, dev)
+    def _f(x, f_opt, x_opt, R, Q, lamb):
+        z = (x - x_opt[None, :]) @ R @ lamb @ Q
+        first = t.pow(z[:,0], 2)
+        second = 100 * t.sqrt(t.sum(t.pow(z[:,1:], 2), dim=-1))
+        return first + second + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, R, Q, lamb], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+# TODO plot doesnt match
+@utils.seedable
+def create_f14(dim, dev=None) -> Problem:
+    f_opt = utils.rand_fopt(dev)
+    x_opt = utils.rand_xopt(dim, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    pow = 2 + 4 * t.arange(0, dim, dtype=t.float32, device=dev) / (dim - 1)
+    def _f(x, f_opt, x_opt, R, pow):
+        z = (x - x_opt[None, :]) @ R
+        f = t.sqrt(t.sum(t.pow(t.abs(z), pow[None, :]), dim=-1))
+        return f + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, R, pow], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+

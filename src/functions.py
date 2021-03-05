@@ -411,3 +411,142 @@ def create_f19(dim, dev=None) -> Problem:
         t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
         t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
     )
+
+
+@utils.seedable
+def create_f20(dim, dev=None) -> Problem:
+    ones = t.bernoulli(t.full((dim,), 0.5, dtype=t.float32, device=dev)) * 2 - 1
+    x_opt = 4.2096874633 / 2.0 * ones
+    f_opt = utils.rand_fopt(dev)
+    lamb = utils.Lambda(10, dim, t.float32, dev).T
+    def _f(x, f_opt, x_opt, lamb, ones):
+        x_hat = 2 * ones[None,:] * x
+        z_hat = x_hat
+        z_hat[:,1:] += 0.25 * (x_hat[:,:-1] - 2 * t.abs(x_opt[None,:-1]))
+        z = 100 * ((z_hat - 2 * t.abs(x_opt[None, :])) @ lamb + 2 * t.abs(x_opt[None,:]))
+        f = -1.0 / 100.0 / dim * t.sum(z * t.sin(t.sqrt(t.abs(z))), dim=-1)
+        pen = 100 * utils.f_pen(z / 100)
+        return f + 4.189828872724339 + pen + f_opt
+    return Problem(
+        _f, [f_opt, x_opt, lamb, ones], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f21(dim, dev=None) -> Problem:
+    optim = utils.random_optims(101, dim, 5.0, 4.0, dev)
+    x_opt = optim[0]
+    f_opt = utils.rand_fopt(dev)
+    C = utils.Cmatrix(101, 100, dim, dev)
+    w = utils.wvector(101, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    def _f(x, f_opt, y, C, w, R):
+        maxims = []
+        for i in range(101):  # TODO vectorize
+            sub = x - y[i][None,:]
+            tmp = sub @ R
+            tmp = t.mm(tmp, C[i].T, out=tmp)
+            tmp = t.mm(tmp, R.T, out=tmp)
+            tmp = t.sum(tmp * sub, dim=-1)
+            tmp *= - 1.0 / (2.0 * dim)
+            tmp = t.exp_(tmp)
+            tmp *= w[i]
+            maxims.append(tmp)
+        maxs, _ = t.max(t.stack(maxims, dim=0), dim=0)
+        f = t.pow(utils.T_osz(10 - maxs), 2, out=maxs)
+        pen = utils.f_pen(x)
+        return f + pen + f_opt
+    return Problem(
+        _f, [f_opt, optim, C, w, R], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f22(dim, dev=None) -> Problem:
+    optim = utils.random_optims(101, dim, 4.9, 3.92, dev)
+    x_opt = optim[0]
+    f_opt = utils.rand_fopt(dev)
+    C = utils.Cmatrix(21, 20, dim, dev, first_pow=2)
+    w = utils.wvector(21, dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    def _f(x, f_opt, y, C, w, R):
+        maxims = []
+        for i in range(21):  # TODO vectorize
+            sub = x - y[i][None,:]
+            tmp = sub @ R
+            tmp = t.mm(tmp, C[i].T, out=tmp)
+            tmp = t.mm(tmp, R.T, out=tmp)
+            tmp = t.sum(tmp * sub, dim=-1)
+            tmp *= - 1.0 / (2.0 * dim)
+            tmp = t.exp_(tmp)
+            tmp *= w[i]
+            maxims.append(tmp)
+        maxs, _ = t.max(t.stack(maxims, dim=0), dim=0)
+        f = t.pow(utils.T_osz(10 - maxs), 2, out=maxs)
+        pen = utils.f_pen(x)
+        return f + pen + f_opt
+    return Problem(
+        _f, [f_opt, optim, C, w, R], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f23(dim, dev=None) -> Problem:
+    x_opt = utils.rand_xopt(dim, dev)
+    f_opt = utils.rand_fopt(dev)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    Q = utils.rotation_matrix(dim, t.float32, dev).T
+    lamb = utils.Lambda(100.0, dim, t.float32, dev).T
+    J = 2 ** t.arange(1, 33, dtype=t.float32, device=dev)
+    def _f(x, f_opt, x_opt, R, Q, lamb, J):
+        z = (x - x_opt[None,:]) @ R @ lamb @ Q
+        jsum = t.abs(J[None, :, None] * z[:, None, :] - t.round_(J[None, :, None]*z[:,None,:])) / J[None, :, None]
+        bracket = t.sum(jsum, dim=1) * t.arange(1, dim+1, dtype=x.dtype, device=x.device)[None,:] + 1
+        prod = t.prod(bracket, dim=-1)
+        prod = t.pow(prod, 10/ dim ** 1.2, out=prod)
+        prod *= 10.0 / dim ** 2.0
+        prod -= 10 / dim ** 2.0
+        prod += utils.f_pen(x)
+        prod += f_opt
+        return prod
+    return Problem(
+        _f, [f_opt, x_opt, R, Q, lamb, J], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )
+
+
+@utils.seedable
+def create_f24(dim, dev=None) -> Problem:
+    s = 1 - 1/(2*math.sqrt(dim+20.0)-8.2)
+    d = 1
+    mu_0 = 2.5
+    mu_1 = -math.sqrt((mu_0 ** 2 - d)/s)
+    R = utils.rotation_matrix(dim, t.float32, dev).T
+    Q = utils.rotation_matrix(dim, t.float32, dev).T
+    lamb = utils.Lambda(100, dim, t.float32, dev)
+    ones = t.ones(size=(dim,), dtype=t.float32, device=dev)
+    f_opt = utils.rand_fopt()
+    x_opt = mu_0 / 2.0 * t.bernoulli(t.full((dim,), 0.5, dtype=t.float32, device=dev)) * 2.0 - 1.0
+    def _f(x, R, Q, lamb, ones, f_opt, x_opt):
+        x_hat = 2 * t.sign(x_opt)[None,:] * x
+        z = (x_hat - mu_0) @ R @ lamb @ Q
+        min1 = t.sum(t.pow(x_hat - mu_0, 2), dim=-1)
+        min2 = d*dim + s * t.sum(t.pow(x_hat - mu_1, 2), dim=-1)
+        m = t.min(min1, min2, out=min1)
+        second = 10 * (dim - t.sum(t.cos(2*utils.PI*z), dim=-1, out=min2))
+        second += 10 ** 4 * utils.f_pen(x)
+        second += f_opt
+        second += m
+        return second
+    return Problem(
+        _f, [R, Q, lamb, ones, f_opt, x_opt], x_opt, f_opt,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
+        t.ones(size=(dim,), dtype=t.float32, device=dev) * 5
+    )

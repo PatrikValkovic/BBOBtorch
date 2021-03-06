@@ -63,15 +63,19 @@ def random_optims(num, dim, localmax, globalmax, dev = None):
 def Cmatrix(num, setsize, dim, dev = None, first_pow = 1):
     set = t.pow(1000, 2 * t.arange(setsize, dtype=t.float32, device=dev) / setsize)
     diagonals = []
-    diagonals.append(Lambda(1000 ** first_pow, dim, t.float32, dev) / pow(1000, 0.25))
+    l = Lambda(1000 ** first_pow, dim, t.float32, dev).T / pow(1000, 0.25)
+    d = t.diag(l)
+    p = t.randperm(dim)
+    l = t.diag(d[p], out=l)
+    diagonals.append(l.T)
     for i in range(num-1):
         alpha = float(set[t.randint(len(set), size=(1,))])
         l = Lambda(alpha, dim, t.float32, dev) / pow(alpha, 0.25)
         d = t.diag(l)
         p = t.randperm(dim)
         l = t.diag(d[p], out=l)
-        diagonals.append(l)
-    return t.stack(diagonals, dim=0)
+        diagonals.append(l.T)
+    return t.stack(diagonals, dim=-1)
 
 def wvector(num, dev):
     w = 1.1 + 8 * (t.arange(num, dtype=t.float32, device=dev) - 1) / num

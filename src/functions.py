@@ -443,21 +443,17 @@ def create_f21(dim, dev=None) -> Problem:
     w = utils.wvector(101, dev)
     R = utils.rotation_matrix(dim, t.float32, dev).T
     def _f(x, f_opt, y, C, w, R):
-        maxims = []
-        for i in range(101):  # TODO vectorize
-            sub = x - y[i][None,:]
-            tmp = sub @ R
-            tmp = t.mm(tmp, C[i].T, out=tmp)
-            tmp = t.mm(tmp, R.T, out=tmp)
-            tmp = t.sum(tmp * sub, dim=-1)
-            tmp *= - 1.0 / (2.0 * dim)
-            tmp = t.exp_(tmp)
-            tmp *= w[i]
-            maxims.append(tmp)
-        maxs, _ = t.max(t.stack(maxims, dim=0), dim=0)
-        f = t.pow(utils.T_osz(10 - maxs), 2, out=maxs)
+        diff = x[:,None,:] - y[None,:,:]
+        multiplied_by_c = t.einsum("mwi,ijw->mwi", diff @ R, C)
+        multiplied_by_c @= R.T
+        in_bracket = t.multiply(multiplied_by_c, diff, out=diff)
+        in_bracket = -1.0 / (2.0*dim) * t.sum(in_bracket, dim=-1)
+        inside_max = t.multiply(w[None,:], t.exp(in_bracket))
+        max, _ = t.max(inside_max, dim=-1)
+        tosz = utils.T_osz(10 - max)
+        tosz = t.pow(tosz, 2, out=tosz)
         pen = utils.f_pen(x)
-        return f + pen + f_opt
+        return tosz + pen + f_opt
     return Problem(
         _f, [f_opt, optim, C, w, R], x_opt, f_opt,
         t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,
@@ -467,28 +463,24 @@ def create_f21(dim, dev=None) -> Problem:
 
 @utils.seedable
 def create_f22(dim, dev=None) -> Problem:
-    optim = utils.random_optims(101, dim, 4.9, 3.92, dev)
+    optim = utils.random_optims(21, dim, 4.9, 3.92, dev)
     x_opt = optim[0]
     f_opt = utils.rand_fopt(dev)
     C = utils.Cmatrix(21, 20, dim, dev, first_pow=2)
     w = utils.wvector(21, dev)
     R = utils.rotation_matrix(dim, t.float32, dev).T
     def _f(x, f_opt, y, C, w, R):
-        maxims = []
-        for i in range(21):  # TODO vectorize
-            sub = x - y[i][None,:]
-            tmp = sub @ R
-            tmp = t.mm(tmp, C[i].T, out=tmp)
-            tmp = t.mm(tmp, R.T, out=tmp)
-            tmp = t.sum(tmp * sub, dim=-1)
-            tmp *= - 1.0 / (2.0 * dim)
-            tmp = t.exp_(tmp)
-            tmp *= w[i]
-            maxims.append(tmp)
-        maxs, _ = t.max(t.stack(maxims, dim=0), dim=0)
-        f = t.pow(utils.T_osz(10 - maxs), 2, out=maxs)
+        diff = x[:, None, :] - y[None, :, :]
+        multiplied_by_c = t.einsum("mwi,ijw->mwi", diff @ R, C)
+        multiplied_by_c @= R.T
+        in_bracket = t.multiply(multiplied_by_c, diff, out=diff)
+        in_bracket = -1.0 / (2.0 * dim) * t.sum(in_bracket, dim=-1)
+        inside_max = t.multiply(w[None, :], t.exp(in_bracket))
+        max, _ = t.max(inside_max, dim=-1)
+        tosz = utils.T_osz(10 - max)
+        tosz = t.pow(tosz, 2, out=tosz)
         pen = utils.f_pen(x)
-        return f + pen + f_opt
+        return tosz + pen + f_opt
     return Problem(
         _f, [f_opt, optim, C, w, R], x_opt, f_opt,
         t.ones(size=(dim,), dtype=t.float32, device=dev) * -5,

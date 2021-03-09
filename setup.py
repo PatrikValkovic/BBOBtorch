@@ -7,7 +7,7 @@
 
 from setuptools import setup
 
-v = '2.0.0'
+v = '1.0.1'
 # read the contents of your README file
 from os import path
 this_directory = path.abspath(path.dirname(__file__))
@@ -16,7 +16,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name="BBOBtorch",
-    version="1.0.0",
+    version=v,
     description="Vectorized BBOB functions in torch",
     url="https://github.com/PatrikValkovic/BBOBtorch",
     download_url='https://github.com/PatrikValkovic/BBOBtorch/archive/v' + v + '.tar.gz',
